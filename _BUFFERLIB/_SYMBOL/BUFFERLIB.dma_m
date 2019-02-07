@@ -1,0 +1,102 @@
+$SET SHARING=SHAREDBYALL                                                10000100ADC-190207
+ BEGIN                                                                  10000200ADC-190207
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%10000300ADC-190207
+ %% NOTAS:                                                            %%10000400ADC-190207
+ %%  - Esta library sirve para almacenar temporalmente un arreglo,    %%10000500ADC-190207
+ %%    se ocupa en la comunicacion con el OBJECT/IOHANDLER ya que el  %%10000600ADC-190207
+ %%    atributo IOSTRING tiene un largo limitado                      %%10000700ADC-190207
+ %%  - Esta library deberia ser SYSTEM LIBRARY, pero para no complicar%%10000800ADC-190207
+ %%    las cosas aqui en PROEXSI la vamos a mantener privada          %%10000900ADC-190207
+ %%  - Antes de promoverla a SYSTEM LIBRARY se deberia construir un   %%10001000ADC-190207
+ %%    mecanismo se semaforo para evitar colisiones en llamadas con-  %%10001100ADC-190207
+ %%    currentes al procedimiento PUT                                 %%10001200ADC-190207
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%10001300ADC-190207
+ DEFINE                                                                 10001400ADC-190207
+   maxBuffers = 10 #                                                    10001500ADC-190207
+  ,CAND(X,Y) = IF(X)THEN(Y)ELSE FALSE #                                 10001600ADC-190207
+  ,K = 1024 #                                                           10001700ADC-190207
+  ;                                                                     10001800ADC-190207
+ ARRAY                                                                  10001900ADC-190207
+   flag [0:maxBuffers-1]                                                10002000ADC-190207
+  ;                                                                     10002100ADC-190207
+ EBCDIC ARRAY                                                           10002200ADC-190207
+   buffer [0:maxBuffers-1, 0:1*K]                                       10002300ADC-190207
+  ;                                                                     10002400ADC-190207
+                                                                        10002500ADC-190207
+ INTEGER PROCEDURE PUT(content);                                        10002600ADC-190207
+   EBCDIC ARRAY        content[0];                                      10002700ADC-190207
+   BEGIN                                                                10002800ADC-190207
+   INTEGER                                                              10002900ADC-190207
+     inx                                                                10003000ADC-190207
+    ;                                                                   10003100ADC-190207
+   LABEL                                                                10003200ADC-190207
+     eXit                                                               10003300ADC-190207
+    ;                                                                   10003400ADC-190207
+                                                                        10003500ADC-190207
+   inx := -1;                                                           10003600ADC-190207
+   % El acceso al arreglo flag deberia estar protegido por un semaforo! 10003650ADC-190207
+   WHILE CAND(inx:=*+1 < maxBuffers, flag[inx] ^= 0) DO;                10003700ADC-190207
+   IF inx >= maxBuffers THEN                                            10003800ADC-190207
+     BEGIN                                                              10003900ADC-190207
+     inx := -1;                                                         10004000ADC-190207
+     GO eXit;                                                           10004100ADC-190207
+     END;                                                               10004200ADC-190207
+                                                                        10004300ADC-190207
+   IF SIZE(content) ^= SIZE(buffer[inx,*]) THEN                         10004400ADC-190207
+     RESIZE(buffer[inx,*], SIZE(content), DISCARD);                     10004500ADC-190207
+   REPLACE buffer[inx,0] BY content FOR SIZE(content);                  10004600ADC-190207
+   flag[inx] := TIME(7);                                                10004700ADC-190207
+ eXit:                                                                  10004800ADC-190207
+   PUT := inx;                                                          10004900ADC-190207
+   END of PUT;                                                          10005000ADC-190207
+                                                                        10005100ADC-190207
+ PROCEDURE GET(inx, content);                                           10005200ADC-190207
+   VALUE       inx;                                                     10005300ADC-190207
+   INTEGER     inx;                                                     10005400ADC-190207
+   EBCDIC ARRAY     content[0];                                         10005500ADC-190207
+   BEGIN                                                                10005600ADC-190207
+   LABEL                                                                10005700ADC-190207
+     eXit                                                               10005800ADC-190207
+    ;                                                                   10005900ADC-190207
+                                                                        10006000ADC-190207
+   IF inx >= SIZE(buffer) OR CAND(inx < SIZE(buffer), flag[inx]=0) THEN 10006100ADC-190207
+     BEGIN                                                              10006200ADC-190207
+     REPLACE content BY 48"00" FOR SIZE(content);                       10006300ADC-190207
+     GO eXit;                                                           10006400ADC-190207
+     END;                                                               10006500ADC-190207
+   IF SIZE(content) < SIZE(buffer[inx,*]) THEN                          10006600ADC-190207
+     RESIZE(content, SIZE(buffer[inx,*]), DISCARD);                     10006700ADC-190207
+   REPLACE content BY buffer[inx,*] FOR SIZE(buffer[inx,*]);            10006800ADC-190207
+   flag[inx] := 0;                                                      10006900ADC-190207
+ eXit:                                                                  10007000ADC-190207
+   END of GET;                                                          10007100ADC-190207
+                                                                        10007200ADC-190207
+ EXPORT                                                                 10007300ADC-190207
+   PUT                                                                  10007400ADC-190207
+  ,GET                                                                  10007500ADC-190207
+  ;                                                                     10007600ADC-190207
+                                                                        10007700ADC-190207
+ IF BOOLEAN(MYSELF.LIBRARYSTATE) THEN                                   10007800ADC-190207
+%   FREEZE (PERMANENT)                                                  10007900ADC-181029
+    FREEZE (TEMPORARY)                                                  10008000ADC-181029
+ ELSE                                                                   10008100ADC-181022
+   BEGIN                                                                10008200ADC-181022
+   EBCDIC ARRAY                                                         10008300ADC-190207
+     dummy[0:20]                                                        10008400ADC-190207
+    ;                                                                   10008500ADC-190207
+   INTEGER                                                              10008600ADC-190207
+     inx                                                                10008700ADC-190207
+    ;                                                                   10008800ADC-190207
+                                                                        10008900ADC-190207
+   REPLACE dummy BY "Hello World!";                                     10009000ADC-190207
+   inx := PUT(dummy); % inx = 0                                         10009100ADC-190207
+   REPLACE dummy BY "Bye bye World!";                                   10009200ADC-190207
+   inx := PUT(dummy); % inx = 1                                         10009300ADC-190207
+   GET(0, dummy);     % dummy = "Hello World!"                          10009400ADC-190207
+   REPLACE dummy BY "Hello Cruel World!";                               10009500ADC-190207
+   inx := PUT(dummy); % inx = 0                                         10009600ADC-190207
+   GET(1, dummy);     % dummy = "Bye bye World!"                        10009700ADC-190207
+   GET(1, dummy);     % dummy = "????????????????????"                  10009800ADC-190207
+   GET(0, dummy);     % dummy = "Hello Cruel World!"                    10009900ADC-190207
+   END;                                                                 10010000ADC-190207
+ END.                                                                   10010100ADC-190207

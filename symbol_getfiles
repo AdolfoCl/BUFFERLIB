@@ -1,0 +1,9 @@
+open 172.16.2.248
+TVPRJUZB
+LB450
+lcd _BUFFERLIB
+lcd _SYMBOL
+get BUFFERLIB/SYMBOL/BUFFERLIB BUFFERLIB.dma_m
+lcd ..
+lcd ..
+quit
